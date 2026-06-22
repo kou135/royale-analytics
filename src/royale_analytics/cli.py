@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import json
+
 import click
 
 from royale_analytics.api_client import ApiClient
+from royale_analytics.brief import render_json, render_markdown
 from royale_analytics.config import load_config
+from royale_analytics.features import build_features
+from royale_analytics.reference import load_reference
 from royale_analytics.store import Store
 
 WHITELIST_IP = "45.79.218.79"
@@ -89,3 +94,25 @@ def fetch() -> None:
             "ギャップ警告: battlelog が満杯（25件）でした。"
             "前回取得からの取りこぼしの可能性があります。"
         )
+
+
+@cli.command()
+@click.option("--json-out", type=click.Path(), default=None)
+def analyze(json_out: str | None) -> None:
+    """蓄積から特徴量を算出し、分析ブリーフ（Markdown＋任意でJSON）を出力する。"""
+    config = load_config()
+
+    store = Store(config.db_path)
+    reference = load_reference()
+
+    battles = store.load_battles(config.player_tag)
+    profile = store.get_latest_profile(config.player_tag)
+
+    features = build_features(battles, profile, reference)
+
+    click.echo(render_markdown(features))
+
+    if json_out is not None:
+        with open(json_out, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(render_json(features), ensure_ascii=False))
+        click.echo(f"JSON ブリーフを書き出しました: {json_out}")
