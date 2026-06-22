@@ -66,3 +66,48 @@ def derive_matchups(battles: list[dict], reference: Reference) -> list[MatchupRo
     ]
     rows.sort(key=lambda r: (r.opponent_archetype, r.mode))
     return rows
+
+
+def detect_loss_patterns(battles: list[dict]) -> dict:
+    total_losses = 0
+    three_crown_losses = 0
+    close_losses = 0
+    for battle in battles:
+        if battle["result"] != "loss":
+            continue
+        total_losses += 1
+        team_crowns = battle["team"]["crowns"]
+        opp_crowns = battle["opponent"]["crowns"]
+        if team_crowns == 0 and opp_crowns == 3:
+            three_crown_losses += 1
+        if abs(team_crowns - opp_crowns) == 1:
+            close_losses += 1
+    return {
+        "total_losses": total_losses,
+        "three_crown_losses": three_crown_losses,
+        "close_losses": close_losses,
+    }
+
+
+def elixir_leaked_summary(battles: list[dict]) -> dict:
+    my_values: list[float] = []
+    opp_values: list[float] = []
+    for battle in battles:
+        team_leaked = battle["team"]["elixir_leaked"]
+        opp_leaked = battle["opponent"]["elixir_leaked"]
+        if team_leaked is None or opp_leaked is None:
+            continue
+        my_values.append(team_leaked)
+        opp_values.append(opp_leaked)
+    sample = len(my_values)
+    if sample == 0:
+        return {"my_avg": None, "opp_avg": None, "delta": None, "sample": 0}
+    my_avg = round(sum(my_values) / sample, 2)
+    opp_avg = round(sum(opp_values) / sample, 2)
+    delta = round(my_avg - opp_avg, 2)
+    return {
+        "my_avg": my_avg,
+        "opp_avg": opp_avg,
+        "delta": delta,
+        "sample": sample,
+    }

@@ -5,6 +5,8 @@ from royale_analytics.features import (
     current_deck,
     derive_matchups,
     mode_of,
+    detect_loss_patterns,
+    elixir_leaked_summary,
 )
 from royale_analytics.reference import load_reference
 from tests.factories import GOLEM_DECK, HOG_DECK, make_battle_view
@@ -98,3 +100,80 @@ def test_derive_matchups_groups_by_opponent_archetype_and_mode():
     assert cycle.wins == 1
     assert cycle.losses == 0
     assert cycle.draws == 0
+
+
+def test_detect_loss_patterns_counts_three_crown_and_close():
+    battles = [
+        # three-crown loss (0-3): also counts? abs diff == 3, so NOT close
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=0, opp_crowns=3,
+        ),
+        # close loss (1-2): abs diff == 1
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=1, opp_crowns=2,
+        ),
+        # a win (not a loss)
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=3, opp_crowns=0,
+        ),
+    ]
+    patterns = detect_loss_patterns(battles)
+    assert patterns == {
+        "total_losses": 2,
+        "three_crown_losses": 1,
+        "close_losses": 1,
+    }
+
+
+def test_elixir_leaked_summary_averages_only_complete_battles():
+    battles = [
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=1, opp_crowns=0,
+            team_elixir_leaked=3.0, opp_elixir_leaked=2.0,
+        ),
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=0, opp_crowns=1,
+            team_elixir_leaked=5.0, opp_elixir_leaked=4.0,
+        ),
+        # excluded: team leaked is None
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=1, opp_crowns=1,
+            team_elixir_leaked=None, opp_elixir_leaked=4.0,
+        ),
+        # excluded: opp leaked is None
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=1, opp_crowns=1,
+            team_elixir_leaked=4.0, opp_elixir_leaked=None,
+        ),
+    ]
+    summary = elixir_leaked_summary(battles)
+    assert summary == {
+        "my_avg": 4.0,
+        "opp_avg": 3.0,
+        "delta": 1.0,
+        "sample": 2,
+    }
+
+
+def test_elixir_leaked_summary_no_complete_battles():
+    battles = [
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=1, opp_crowns=0,
+            team_elixir_leaked=None, opp_elixir_leaked=None,
+        ),
+    ]
+    summary = elixir_leaked_summary(battles)
+    assert summary == {
+        "my_avg": None,
+        "opp_avg": None,
+        "delta": None,
+        "sample": 0,
+    }
