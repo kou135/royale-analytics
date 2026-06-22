@@ -7,6 +7,7 @@ from click.testing import CliRunner
 import royale_analytics.cli as cli_module
 from royale_analytics.cli import cli
 from royale_analytics.config import Config
+from royale_analytics.errors import AccessDeniedError, ConfigError
 from royale_analytics.store import Store
 from tests.factories import HOG_DECK, GOLEM_DECK, make_profile, make_raw_battle
 
@@ -21,13 +22,16 @@ def _config(tmp_path) -> Config:
 
 
 class FakeApiClient:
-    def __init__(self, token, base_url, *, battlelog, profile):
+    def __init__(self, token, base_url, *, battlelog, profile, get_player_error=None):
         self.token = token
         self.base_url = base_url
         self._battlelog = battlelog
         self._profile = profile
+        self._get_player_error = get_player_error
 
     def get_player(self, tag):
+        if self._get_player_error is not None:
+            raise self._get_player_error
         return self._profile
 
     def get_battlelog(self, tag):
@@ -107,3 +111,45 @@ def test_fetch_reports_empty_battlelog(monkeypatch, tmp_path):
 
     assert result.exit_code == 0, result.output
     assert "まだ対戦がありません" in result.output
+
+
+def test_fetch_access_denied_shows_guidance(monkeypatch, tmp_path):
+    """403 AccessDeniedError: CLI exits non-zero and guidance (IP) is shown."""
+    config = _config(tmp_path)
+    error = AccessDeniedError(
+        "Access denied.",
+        status=403,
+        guidance="whitelist 45.79.218.79 on developer.clashroyale.com",
+    )
+
+    def fake_factory(token, base_url):
+        return FakeApiClient(
+            token, base_url, battlelog=[], profile={}, get_player_error=error
+        )
+
+    monkeypatch.setattr(cli_module, "load_config", lambda: config)
+    monkeypatch.setattr(cli_module, "ApiClient", fake_factory)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["fetch"], catch_exceptions=False)
+
+    assert result.exit_code != 0
+    # guidance string must appear in output (CliRunner mixes stderr into output)
+    assert "45.79.218.79" in result.output
+
+
+def test_fetch_config_error_exits_nonzero(monkeypatch):
+    """Missing token ConfigError: CLI exits non-zero with a helpful message."""
+    monkeypatch.setattr(
+        cli_module,
+        "load_config",
+        lambda: (_ for _ in ()).throw(
+            ConfigError("CLASH_ROYALE_API_TOKEN が設定されていません。")
+        ),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["fetch"], catch_exceptions=False)
+
+    assert result.exit_code != 0
+    assert "CLASH_ROYALE_API_TOKEN" in result.output

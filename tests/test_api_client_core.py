@@ -8,6 +8,7 @@ from royale_analytics.errors import (
     AccessDeniedError,
     ApiServerError,
     MaintenanceError,
+    NetworkError,
     NotFoundError,
     ThrottledError,
 )
@@ -130,3 +131,39 @@ def test_persistent_429_raises_throttled():
     assert exc.value.guidance != ""
     # 500_000 microseconds -> 0.5 seconds, slept once per retry (max_retries=2)
     assert slept == [0.5, 0.5]
+
+
+def test_request_error_retries_then_succeeds():
+    """ConnectError on first call triggers retry; second call succeeds."""
+    slept = []
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.ConnectError("connection refused")
+        return httpx.Response(200, json={"ok": True})
+
+    client = make_client(handler, max_retries=2, sleep=lambda s: slept.append(s))
+    body = client._get("/cards")
+
+    assert body == {"ok": True}
+    assert len(slept) == 1  # slept once for the one failed attempt
+    assert calls["n"] == 2
+
+
+def test_persistent_request_error_raises_network_error():
+    """ConnectError on every attempt raises NetworkError after max_retries."""
+    slept = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    client = make_client(handler, max_retries=2, sleep=lambda s: slept.append(s))
+    with pytest.raises(NetworkError) as exc:
+        client._get("/cards")
+
+    assert exc.value.guidance != ""
+    assert "ネットワーク" in exc.value.guidance
+    # slept for each retry (max_retries=2)
+    assert len(slept) == 2

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import sys
 
 import click
 
 from royale_analytics.api_client import ApiClient
 from royale_analytics.brief import render_json, render_markdown
 from royale_analytics.config import load_config
+from royale_analytics.errors import RoyaleAnalyticsError
 from royale_analytics.features import build_features
 from royale_analytics.reference import load_reference
 from royale_analytics.store import Store
@@ -15,7 +17,21 @@ WHITELIST_IP = "45.79.218.79"
 GAP_BATTLELOG_THRESHOLD = 25
 
 
-@click.group()
+class _ErrorHandlingGroup(click.Group):
+    """Click Group that catches RoyaleAnalyticsError and surfaces guidance."""
+
+    def invoke(self, ctx: click.Context) -> object:
+        try:
+            return super().invoke(ctx)
+        except RoyaleAnalyticsError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            guidance = getattr(exc, "guidance", "")
+            if guidance:
+                click.echo(guidance, err=True)
+            ctx.exit(1)
+
+
+@click.group(cls=_ErrorHandlingGroup)
 def cli() -> None:
     """Royale Analytics — クラッシュロワイヤルのAI分析ツール（非公式）。"""
 

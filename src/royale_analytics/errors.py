@@ -55,3 +55,7 @@ class MaintenanceError(ApiError):
 
 class ApiServerError(ApiError):
     """HTTP 5xx: upstream server error."""
+
+
+class NetworkError(ApiError):
+    """Network/timeout error raised after all retries are exhausted."""

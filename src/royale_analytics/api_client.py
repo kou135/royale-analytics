@@ -10,6 +10,7 @@ from royale_analytics.errors import (
     ApiError,
     ApiServerError,
     MaintenanceError,
+    NetworkError,
     NotFoundError,
     ThrottledError,
 )
@@ -36,6 +37,10 @@ _THROTTLED_GUIDANCE = (
 _SERVER_ERROR_GUIDANCE = (
     "Server error from the API. This is usually transient; retry later."
 )
+_NETWORK_ERROR_GUIDANCE = (
+    "ネットワーク接続を確認してください。接続が回復したら再度実行してください。"
+    " (Network error after retries. Check your connection and try again.)"
+)
 
 
 class ApiClient:
@@ -57,8 +62,19 @@ class ApiClient:
     def _get(self, path: str) -> Any:
         headers = {"Authorization": f"Bearer {self.token}"}
         attempts = 0
+        net_attempts = 0
         while True:
-            response = self.client.get(path, headers=headers)
+            try:
+                response = self.client.get(path, headers=headers)
+            except httpx.RequestError as exc:
+                if net_attempts < self.max_retries:
+                    net_attempts += 1
+                    self.sleep(2 ** net_attempts)
+                    continue
+                raise NetworkError(
+                    f"Network error after {self.max_retries} retries: {exc}",
+                    guidance=_NETWORK_ERROR_GUIDANCE,
+                ) from exc
             status = response.status_code
 
             if 200 <= status < 300:
