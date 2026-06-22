@@ -100,3 +100,15 @@ class ApiClient:
                 status=status,
                 guidance="Unexpected response from the API.",
             )
+
+    def get_player(self, tag: str) -> dict:
+        return self._get("/players/" + encode_tag(tag))
+
+    def get_battlelog(self, tag: str) -> list[dict]:
+        return self._get("/players/" + encode_tag(tag) + "/battlelog")
+
+    def get_upcoming_chests(self, tag: str) -> dict:
+        return self._get("/players/" + encode_tag(tag) + "/upcomingchests")
+
+    def get_cards(self) -> dict:
+        return self._get("/cards")
