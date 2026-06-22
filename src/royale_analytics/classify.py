@@ -17,6 +17,14 @@ class DeckClassification:
     card_names: list[str]
 
 
+@dataclass
+class DeckMatch:
+    name: str | None
+    confidence: str
+    overlap: int
+    archetype: str | None
+
+
 def _card_roles(cards: list[dict], reference: Reference) -> list[str]:
     roles_table = reference.card_roles["cards"]
     out = []
@@ -92,4 +100,46 @@ def classify_deck(cards: list[dict], reference: Reference) -> DeckClassification
         role_counts=_role_counts(roles),
         weakness_tags=_weakness_tags(roles, tags),
         card_names=[c["name"] for c in cards],
+    )
+
+
+def match_deck(
+    cards: list[dict], reference: Reference, *, variant_threshold: int = 6
+) -> DeckMatch:
+    """
+    Match a deck against template decks by card-name set overlap.
+
+    Ties (e.g., two templates with equal overlap) resolve to the first-iterated
+    template via strict '>' comparison in the loop.
+    """
+    observed = {c["name"] for c in cards}
+
+    best_template: dict | None = None
+    best_overlap = -1
+    for template in reference.template_decks:
+        overlap = len(observed & set(template["cards"]))
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_template = template
+
+    if best_template is None:
+        return DeckMatch(name=None, confidence="unknown", overlap=0, archetype=None)
+
+    if best_overlap == 8:
+        confidence = "exact"
+    elif best_overlap >= variant_threshold:
+        confidence = "variant"
+    else:
+        confidence = "unknown"
+
+    if confidence == "unknown":
+        return DeckMatch(
+            name=None, confidence="unknown", overlap=best_overlap, archetype=None
+        )
+
+    return DeckMatch(
+        name=best_template["name"],
+        confidence=confidence,
+        overlap=best_overlap,
+        archetype=best_template["archetype"],
     )
