@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import click
 
+from royale_analytics.api_client import ApiClient
 from royale_analytics.config import load_config
 from royale_analytics.store import Store
 
 WHITELIST_IP = "45.79.218.79"
+GAP_BATTLELOG_THRESHOLD = 25
 
 
 @click.group()
@@ -48,3 +50,42 @@ def init() -> None:
         "For more information see Supercell's Fan Content Policy: "
         "www.supercell.com/fan-content-policy."
     )
+
+
+@cli.command()
+def fetch() -> None:
+    """プロフィール＋battlelog（＋upcomingchests）を取得し SQLite に追記する。"""
+    config = load_config()
+
+    client = ApiClient(config.token, config.base_url)
+    store = Store(config.db_path)
+    store.init_schema()
+
+    profile = client.get_player(config.player_tag)
+    battlelog = client.get_battlelog(config.player_tag)
+
+    try:
+        client.get_upcoming_chests(config.player_tag)
+    except Exception as exc:  # noqa: BLE001 - chests は任意。失敗しても続行
+        click.echo(f"upcomingchests の取得に失敗しました（続行します）: {exc}")
+
+    if not battlelog:
+        click.echo(
+            "まだ対戦がありません（battlelog が空です）。"
+            "プレイしてから再実行してください。"
+        )
+
+    new_battles = store.upsert_battles(config.player_tag, battlelog)
+    store.save_profile_snapshot(config.player_tag, profile)
+
+    gap_suspected = len(battlelog) >= GAP_BATTLELOG_THRESHOLD
+    store.record_fetch(
+        config.player_tag, new_battles, gap_suspected=gap_suspected
+    )
+
+    click.echo(f"{new_battles} 件の新規対戦を取得")
+    if gap_suspected:
+        click.echo(
+            "ギャップ警告: battlelog が満杯（25件）でした。"
+            "前回取得からの取りこぼしの可能性があります。"
+        )
