@@ -21,25 +21,17 @@ def _config(tmp_path) -> Config:
 
 
 class FakeApiClient:
-    def __init__(self, token, base_url, *, battlelog, profile, chests=None,
-                 chests_error=None):
+    def __init__(self, token, base_url, *, battlelog, profile):
         self.token = token
         self.base_url = base_url
         self._battlelog = battlelog
         self._profile = profile
-        self._chests = chests if chests is not None else {"items": []}
-        self._chests_error = chests_error
 
     def get_player(self, tag):
         return self._profile
 
     def get_battlelog(self, tag):
         return self._battlelog
-
-    def get_upcoming_chests(self, tag):
-        if self._chests_error is not None:
-            raise self._chests_error
-        return self._chests
 
 
 def test_fetch_reports_new_battle_count(tmp_path, monkeypatch):
@@ -72,7 +64,8 @@ def test_fetch_reports_new_battle_count(tmp_path, monkeypatch):
     assert len(Store(config.db_path).load_battles(config.player_tag)) == 2
 
 
-def test_fetch_gap_note_and_tolerates_chests_failure(tmp_path, monkeypatch):
+def test_fetch_gap_note(tmp_path, monkeypatch):
+    """25件のbattlelogでギャップ警告が出ること。chestsコールは行わない。"""
     config = _config(tmp_path)
     battlelog = [
         make_raw_battle(team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
@@ -84,10 +77,7 @@ def test_fetch_gap_note_and_tolerates_chests_failure(tmp_path, monkeypatch):
     profile = make_profile({"Hog Rider": (11, 14)})
 
     def fake_factory(token, base_url):
-        return FakeApiClient(
-            token, base_url, battlelog=battlelog, profile=profile,
-            chests_error=RuntimeError("chests boom"),
-        )
+        return FakeApiClient(token, base_url, battlelog=battlelog, profile=profile)
 
     monkeypatch.setattr(cli_module, "load_config", lambda: config)
     monkeypatch.setattr(cli_module, "ApiClient", fake_factory)
@@ -98,7 +88,8 @@ def test_fetch_gap_note_and_tolerates_chests_failure(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "25 件の新規対戦を取得" in result.output
     assert "ギャップ警告" in result.output  # 25 >= 25
-    assert "upcomingchests の取得に失敗" in result.output  # tolerated, not fatal
+    # fetch no longer calls chests — no chest-related output
+    assert "upcomingchests" not in result.output
 
 
 def test_fetch_reports_empty_battlelog(monkeypatch, tmp_path):

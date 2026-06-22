@@ -59,7 +59,7 @@ def init() -> None:
 
 @cli.command()
 def fetch() -> None:
-    """プロフィール＋battlelog（＋upcomingchests）を取得し SQLite に追記する。"""
+    """プロフィール＋battlelog を取得し SQLite に追記する。"""
     config = load_config()
 
     client = ApiClient(config.token, config.base_url)
@@ -68,11 +68,6 @@ def fetch() -> None:
 
     profile = client.get_player(config.player_tag)
     battlelog = client.get_battlelog(config.player_tag)
-
-    try:
-        client.get_upcoming_chests(config.player_tag)
-    except Exception as exc:  # noqa: BLE001 - chests は任意。失敗しても続行
-        click.echo(f"upcomingchests の取得に失敗しました（続行します）: {exc}")
 
     if not battlelog:
         click.echo(
