@@ -240,3 +240,77 @@ class Store:
             ),
         )
         self.conn.commit()
+
+    def load_battles(self, player_tag: str) -> list[dict]:
+        battle_rows = self.conn.execute(
+            "SELECT id, battle_time, game_mode_name, is_ladder_tournament, "
+            "league_number, result FROM battles WHERE player_tag = ? "
+            "ORDER BY battle_time",
+            (player_tag,),
+        ).fetchall()
+        views: list[dict] = []
+        for (
+            battle_id,
+            battle_time,
+            game_mode_name,
+            is_ladder_tournament,
+            league_number,
+            result,
+        ) in battle_rows:
+            views.append(
+                {
+                    "battle_time": battle_time,
+                    "game_mode_name": game_mode_name,
+                    "is_ladder_tournament": bool(is_ladder_tournament),
+                    "league_number": league_number,
+                    "result": result,
+                    "team": self._load_side(battle_id, "team"),
+                    "opponent": self._load_side(battle_id, "opponent"),
+                }
+            )
+        return views
+
+    def _load_side(self, battle_id: int, side: str) -> dict:
+        side_row = self.conn.execute(
+            "SELECT tag, name, crowns, trophy_change, elixir_leaked, deck_key "
+            "FROM battle_sides WHERE battle_id = ? AND side = ?",
+            (battle_id, side),
+        ).fetchone()
+        tag, name, crowns, trophy_change, elixir_leaked, deck_key = side_row
+        card_rows = self.conn.execute(
+            "SELECT card_name, card_id, level, max_level, elixir_cost, "
+            "rarity, evolution_level FROM battle_cards "
+            "WHERE battle_id = ? AND side = ? ORDER BY id",
+            (battle_id, side),
+        ).fetchall()
+        cards = [
+            {
+                "name": r[0],
+                "id": r[1],
+                "level": r[2],
+                "max_level": r[3],
+                "elixir_cost": r[4],
+                "rarity": r[5],
+                "evolution_level": r[6],
+            }
+            for r in card_rows
+        ]
+        return {
+            "tag": tag,
+            "name": name,
+            "crowns": crowns,
+            "trophy_change": trophy_change,
+            "elixir_leaked": elixir_leaked,
+            "deck_key": deck_key,
+            "cards": cards,
+        }
+
+    def get_latest_profile(self, player_tag: str) -> dict | None:
+        row = self.conn.execute(
+            "SELECT raw_json FROM profile_snapshots WHERE player_tag = ? "
+            "ORDER BY id DESC LIMIT 1",
+            (player_tag,),
+        ).fetchone()
+        if row is None:
+            return None
+        return json.loads(row[0])
