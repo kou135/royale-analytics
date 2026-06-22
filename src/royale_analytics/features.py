@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 
-from .classify import DeckClassification, classify_deck
+from .classify import DeckClassification, DeckMatch, classify_deck, match_deck
 from .reference import Reference
 
 _OTHER_MODE_TOKENS = ("Tournament", "Challenge", "Friendly")
@@ -204,3 +204,39 @@ def frequent_opponent_decks(
             )
         )
     return decks
+
+
+@dataclass
+class Features:
+    my_deck: DeckClassification | None
+    my_deck_match: DeckMatch | None
+    matchups: list[MatchupRow]
+    loss_patterns: dict
+    level_deficits: list[LevelDeficit]
+    elixir_leaked: dict
+    frequent_opponent_decks: list[OpponentDeck]
+    sample_size: int
+    gap_warning: bool
+    modes_present: list[str]
+
+
+def build_features(
+    battles: list[dict], profile: dict | None, reference: Reference
+) -> Features:
+    deck_cards = current_deck(battles)
+    my_deck = classify_deck(deck_cards, reference) if deck_cards else None
+    my_deck_match = match_deck(deck_cards, reference) if deck_cards else None
+    sample_size = len(battles)
+    modes_present = sorted({mode_of(battle) for battle in battles})
+    return Features(
+        my_deck=my_deck,
+        my_deck_match=my_deck_match,
+        matchups=derive_matchups(battles, reference),
+        loss_patterns=detect_loss_patterns(battles),
+        level_deficits=detect_level_deficits(profile, deck_cards),
+        elixir_leaked=elixir_leaked_summary(battles),
+        frequent_opponent_decks=frequent_opponent_decks(battles, reference),
+        sample_size=sample_size,
+        gap_warning=sample_size >= 25,
+        modes_present=modes_present,
+    )

@@ -236,3 +236,60 @@ def test_frequent_opponent_decks_counts_and_classifies():
     assert first.wins == 1
     assert first.losses == 1
     assert "Golem" in first.sample_names
+
+
+from royale_analytics.features import Features, build_features  # noqa: E402
+
+
+def test_build_features_empty_battles():
+    ref = load_reference()
+    features = build_features([], None, ref)
+    assert isinstance(features, Features)
+    assert features.my_deck is None
+    assert features.my_deck_match is None
+    assert features.matchups == []
+    assert features.level_deficits == []
+    assert features.frequent_opponent_decks == []
+    assert features.sample_size == 0
+    assert features.gap_warning is False
+    assert features.modes_present == []
+    assert features.loss_patterns == {
+        "total_losses": 0,
+        "three_crown_losses": 0,
+        "close_losses": 0,
+    }
+    assert features.elixir_leaked == {
+        "my_avg": None,
+        "opp_avg": None,
+        "delta": None,
+        "sample": 0,
+    }
+
+
+def test_build_features_populated():
+    ref = load_reference()
+    profile = make_profile({"Hog Rider": (11, 14), "Cannon": (14, 14)})
+    battles = [
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=0, opp_crowns=3,
+            battle_time="2026-05-01T00:00:00+00:00",
+            mode_fields={"game_mode_name": "Ladder",
+                         "is_ladder_tournament": False, "league_number": None},
+        ),
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=2, opp_crowns=1,
+            battle_time="2026-05-02T00:00:00+00:00",
+            mode_fields={"game_mode_name": "Ranked",
+                         "is_ladder_tournament": False, "league_number": 5},
+        ),
+    ]
+    features = build_features(battles, profile, ref)
+    # current_deck is the most-recent battle's team (HOG_DECK) -> cycle
+    assert features.my_deck is not None
+    assert features.my_deck.archetype == "cycle"
+    assert features.sample_size == 2
+    assert features.modes_present == ["ladder", "ranked"]
+    # level deficit from profile against the current (Hog) deck
+    assert any(d.card_name == "Hog Rider" for d in features.level_deficits)
