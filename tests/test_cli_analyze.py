@@ -49,6 +49,26 @@ def test_analyze_outputs_markdown(tmp_path, monkeypatch):
     assert "あなたのデッキ" in result.output
 
 
+def test_analyze_fresh_db_no_crash(tmp_path, monkeypatch):
+    """analyze against a never-initialized DB must not raise; sample_size==0 note emitted."""
+    from royale_analytics.config import Config
+    config = Config(
+        token="tok-fresh",
+        base_url="https://proxy.royaleapi.dev/v1",
+        player_tag="#FRESH",
+        db_path=str(tmp_path / "fresh.sqlite"),
+    )
+    monkeypatch.setattr(cli_module, "load_config", lambda: config)
+    monkeypatch.setattr(cli_module, "load_reference", load_reference)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["analyze"])
+
+    assert result.exit_code == 0, result.output
+    # brief.render_markdown emits this when sample_size == 0
+    assert "まだ試合がない" in result.output
+
+
 def test_analyze_json_out_writes_valid_json(tmp_path, monkeypatch):
     config = _seed_store(tmp_path)
     monkeypatch.setattr(cli_module, "load_config", lambda: config)

@@ -103,6 +103,7 @@ def analyze(json_out: str | None) -> None:
     config = load_config()
 
     store = Store(config.db_path)
+    store.init_schema()
     reference = load_reference()
 
     battles = store.load_battles(config.player_tag)
