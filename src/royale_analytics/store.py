@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
+from datetime import datetime, timezone
+
+from royale_analytics.battletime import to_utc_iso
+from royale_analytics.decks import compute_deck_key
+from royale_analytics.errors import BattleTimeParseError
 
 
 _SCHEMA = """
@@ -76,6 +82,31 @@ CREATE TABLE IF NOT EXISTS fetch_log (
 """
 
 
+def _to_card_dict(api_card: dict) -> dict:
+    """Convert an API camelCase card to the contract's snake_case card dict."""
+    return {
+        "name": api_card["name"],
+        "id": api_card["id"],
+        "level": api_card["level"],
+        "max_level": api_card["maxLevel"],
+        "elixir_cost": api_card["elixirCost"],
+        "rarity": api_card.get("rarity", ""),
+        "evolution_level": api_card.get("evolutionLevel"),
+    }
+
+
+def _derive_result(team_crowns: int, opponent_crowns: int) -> str:
+    if team_crowns > opponent_crowns:
+        return "win"
+    if team_crowns < opponent_crowns:
+        return "loss"
+    return "draw"
+
+
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 class Store:
     def __init__(self, db_path: str) -> None:
         self.db_path = db_path
@@ -90,3 +121,122 @@ class Store:
 
     def close(self) -> None:
         self.conn.close()
+
+    def upsert_battles(self, player_tag: str, battlelog: list[dict]) -> int:
+        inserted = 0
+        for raw in battlelog:
+            team = raw["team"][0]
+            opponent = raw["opponent"][0]
+            opponent_tag = opponent["tag"]
+            try:
+                battle_time = to_utc_iso(raw["battleTime"])
+            except BattleTimeParseError:
+                continue
+            game_mode = raw.get("gameMode") or {}
+            arena = raw.get("arena") or {}
+            cur = self.conn.execute(
+                "INSERT OR IGNORE INTO battles ("
+                "player_tag, opponent_tag, battle_time, type, "
+                "game_mode_id, game_mode_name, arena_name, "
+                "is_ladder_tournament, league_number, deck_selection, "
+                "result, raw_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    player_tag,
+                    opponent_tag,
+                    battle_time,
+                    raw.get("type"),
+                    game_mode.get("id"),
+                    game_mode.get("name"),
+                    arena.get("name"),
+                    1 if raw.get("isLadderTournament") else 0,
+                    raw.get("leagueNumber"),
+                    raw.get("deckSelection"),
+                    _derive_result(team["crowns"], opponent["crowns"]),
+                    json.dumps(raw),
+                ),
+            )
+            if cur.rowcount == 0:
+                # Already present (UNIQUE collision) -> skip side/card writes.
+                continue
+            inserted += 1
+            battle_id = cur.lastrowid
+            self._insert_side(battle_id, "team", team)
+            self._insert_side(battle_id, "opponent", opponent)
+        self.conn.commit()
+        return inserted
+
+    def _insert_side(self, battle_id: int, side: str, raw_side: dict) -> None:
+        cards = [_to_card_dict(c) for c in raw_side.get("cards", [])]
+        deck_key = compute_deck_key(cards)
+        self.conn.execute(
+            "INSERT INTO battle_sides ("
+            "battle_id, side, tag, name, crowns, starting_trophies, "
+            "trophy_change, king_tower_hp, princess_towers_hp, "
+            "elixir_leaked, global_rank, clan_tag, deck_key) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                battle_id,
+                side,
+                raw_side.get("tag"),
+                raw_side.get("name"),
+                raw_side.get("crowns"),
+                raw_side.get("startingTrophies"),
+                raw_side.get("trophyChange"),
+                raw_side.get("kingTowerHitPoints"),
+                None,
+                raw_side.get("elixirLeaked"),
+                raw_side.get("globalRank"),
+                (raw_side.get("clan") or {}).get("tag"),
+                deck_key,
+            ),
+        )
+        for card in cards:
+            self.conn.execute(
+                "INSERT INTO battle_cards ("
+                "battle_id, side, card_id, card_name, level, max_level, "
+                "evolution_level, star_level, rarity, elixir_cost) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    battle_id,
+                    side,
+                    card["id"],
+                    card["name"],
+                    card["level"],
+                    card["max_level"],
+                    card["evolution_level"],
+                    None,
+                    card["rarity"],
+                    card["elixir_cost"],
+                ),
+            )
+
+    def save_profile_snapshot(self, player_tag: str, profile: dict) -> None:
+        self.conn.execute(
+            "INSERT INTO profile_snapshots ("
+            "player_tag, fetched_at, trophies, best_trophies, raw_json) "
+            "VALUES (?,?,?,?,?)",
+            (
+                player_tag,
+                _utcnow_iso(),
+                profile.get("trophies"),
+                profile.get("bestTrophies"),
+                json.dumps(profile),
+            ),
+        )
+        self.conn.commit()
+
+    def record_fetch(
+        self, player_tag: str, new_battles: int, gap_suspected: bool
+    ) -> None:
+        self.conn.execute(
+            "INSERT INTO fetch_log ("
+            "player_tag, fetched_at, new_battles, gap_suspected) "
+            "VALUES (?,?,?,?)",
+            (
+                player_tag,
+                _utcnow_iso(),
+                new_battles,
+                1 if gap_suspected else 0,
+            ),
+        )
+        self.conn.commit()
