@@ -97,6 +97,21 @@ def test_get_latest_profile_returns_none_when_empty():
     assert store.get_latest_profile("#ME") is None
 
 
+def test_latest_gap_suspected_returns_none_when_no_fetch_log():
+    store = _new_store()
+    assert store.latest_gap_suspected("#ME") is None
+
+
+def test_latest_gap_suspected_returns_most_recent_bool():
+    store = _new_store()
+    store.record_fetch("#ME", new_battles=5, gap_suspected=False)
+    store.record_fetch("#ME", new_battles=25, gap_suspected=True)
+    assert store.latest_gap_suspected("#ME") is True
+    # a third fetch with False should flip it back
+    store.record_fetch("#ME", new_battles=10, gap_suspected=False)
+    assert store.latest_gap_suspected("#ME") is False
+
+
 def test_get_latest_profile_returns_most_recent():
     store = _new_store()
     first = make_profile({"Hog Rider": (10, 14)})

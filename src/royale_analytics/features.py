@@ -221,13 +221,18 @@ class Features:
 
 
 def build_features(
-    battles: list[dict], profile: dict | None, reference: Reference
+    battles: list[dict],
+    profile: dict | None,
+    reference: Reference,
+    *,
+    gap_suspected: bool | None = None,
 ) -> Features:
     deck_cards = current_deck(battles)
     my_deck = classify_deck(deck_cards, reference) if deck_cards else None
     my_deck_match = match_deck(deck_cards, reference) if deck_cards else None
     sample_size = len(battles)
     modes_present = sorted({mode_of(battle) for battle in battles})
+    gap_warning = bool(gap_suspected) if gap_suspected is not None else sample_size >= 25
     return Features(
         my_deck=my_deck,
         my_deck_match=my_deck_match,
@@ -237,6 +242,6 @@ def build_features(
         elixir_leaked=elixir_leaked_summary(battles),
         frequent_opponent_decks=frequent_opponent_decks(battles, reference),
         sample_size=sample_size,
-        gap_warning=sample_size >= 25,
+        gap_warning=gap_warning,
         modes_present=modes_present,
     )

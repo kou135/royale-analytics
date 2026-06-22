@@ -108,8 +108,9 @@ def analyze(json_out: str | None) -> None:
 
     battles = store.load_battles(config.player_tag)
     profile = store.get_latest_profile(config.player_tag)
+    gap = store.latest_gap_suspected(config.player_tag)
 
-    features = build_features(battles, profile, reference)
+    features = build_features(battles, profile, reference, gap_suspected=gap)
 
     click.echo(render_markdown(features))
 

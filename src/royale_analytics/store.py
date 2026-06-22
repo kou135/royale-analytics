@@ -305,6 +305,16 @@ class Store:
             "cards": cards,
         }
 
+    def latest_gap_suspected(self, player_tag: str) -> bool | None:
+        row = self.conn.execute(
+            "SELECT gap_suspected FROM fetch_log WHERE player_tag = ? "
+            "ORDER BY id DESC LIMIT 1",
+            (player_tag,),
+        ).fetchone()
+        if row is None:
+            return None
+        return bool(row[0])
+
     def get_latest_profile(self, player_tag: str) -> dict | None:
         row = self.conn.execute(
             "SELECT raw_json FROM profile_snapshots WHERE player_tag = ? "

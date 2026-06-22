@@ -266,6 +266,48 @@ def test_build_features_empty_battles():
     }
 
 
+def test_build_features_gap_warning_from_gap_suspected_true():
+    """gap_suspected=True forces gap_warning True even with <25 battles."""
+    ref = load_reference()
+    battles = [
+        make_battle_view(team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+                         team_crowns=1, opp_crowns=0),
+    ]
+    features = build_features(battles, None, ref, gap_suspected=True)
+    assert features.gap_warning is True
+
+
+def test_build_features_gap_warning_from_gap_suspected_false():
+    """gap_suspected=False forces gap_warning False even if sample would trigger fallback."""
+    ref = load_reference()
+    # Build exactly 25 battles to confirm fallback would be True.
+    battles = [
+        make_battle_view(team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+                         team_crowns=1, opp_crowns=0,
+                         battle_time=f"2026-05-01T{i:02d}:00:00+00:00")
+        for i in range(25)
+    ]
+    # Without param: sample_size>=25 so fallback would be True.
+    features_default = build_features(battles, None, ref)
+    assert features_default.gap_warning is True
+    # With gap_suspected=False: should be False.
+    features_explicit = build_features(battles, None, ref, gap_suspected=False)
+    assert features_explicit.gap_warning is False
+
+
+def test_build_features_gap_warning_fallback_when_none():
+    """gap_suspected=None (default) falls back to sample_size>=25 logic."""
+    ref = load_reference()
+    small_battles = [
+        make_battle_view(team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+                         team_crowns=1, opp_crowns=0),
+    ]
+    # Small list: fallback => False
+    assert build_features(small_battles, None, ref, gap_suspected=None).gap_warning is False
+    # No param at all: same result
+    assert build_features(small_battles, None, ref).gap_warning is False
+
+
 def test_build_features_populated():
     ref = load_reference()
     profile = make_profile({"Hog Rider": (11, 14), "Cannon": (14, 14)})
