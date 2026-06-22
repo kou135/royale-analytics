@@ -177,3 +177,62 @@ def test_elixir_leaked_summary_no_complete_battles():
         "delta": None,
         "sample": 0,
     }
+
+
+from royale_analytics.features import (  # noqa: E402
+    LevelDeficit,
+    OpponentDeck,
+    detect_level_deficits,
+    frequent_opponent_decks,
+)
+from tests.factories import make_profile  # noqa: E402
+
+
+def test_detect_level_deficits_for_under_leveled_card_in_deck():
+    profile = make_profile({"Hog Rider": (11, 14), "Cannon": (14, 14)})
+    deficits = detect_level_deficits(profile, HOG_DECK)
+    assert isinstance(deficits, list)
+    hog = next(d for d in deficits if d.card_name == "Hog Rider")
+    assert hog == LevelDeficit(
+        card_name="Hog Rider", level=11, max_level=14, deficit=3
+    )
+    # Cannon is maxed (14/14): no deficit row
+    assert all(d.card_name != "Cannon" for d in deficits)
+
+
+def test_detect_level_deficits_none_inputs_return_empty():
+    assert detect_level_deficits(None, HOG_DECK) == []
+    assert detect_level_deficits(make_profile({"Hog Rider": (11, 14)}), None) == []
+    assert detect_level_deficits(None, None) == []
+
+
+def test_frequent_opponent_decks_counts_and_classifies():
+    ref = load_reference()
+    battles = [
+        # vs same Golem deck (loss)
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=0, opp_crowns=3,
+            battle_time="2026-05-01T00:00:00+00:00",
+        ),
+        # vs same Golem deck (win)
+        make_battle_view(
+            team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+            team_crowns=2, opp_crowns=1,
+            battle_time="2026-05-01T01:00:00+00:00",
+        ),
+        # vs a Hog deck (win)
+        make_battle_view(
+            team_cards=GOLEM_DECK, opp_cards=HOG_DECK,
+            team_crowns=3, opp_crowns=0,
+            battle_time="2026-05-01T02:00:00+00:00",
+        ),
+    ]
+    decks = frequent_opponent_decks(battles, ref, top=5)
+    assert isinstance(decks[0], OpponentDeck)
+    first = decks[0]
+    assert first.count == 2
+    assert first.archetype == "beatdown"
+    assert first.wins == 1
+    assert first.losses == 1
+    assert "Golem" in first.sample_names

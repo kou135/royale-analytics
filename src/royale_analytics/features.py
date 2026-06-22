@@ -111,3 +111,96 @@ def elixir_leaked_summary(battles: list[dict]) -> dict:
         "delta": delta,
         "sample": sample,
     }
+
+
+@dataclass
+class LevelDeficit:
+    card_name: str
+    level: int
+    max_level: int
+    deficit: int
+
+
+@dataclass
+class OpponentDeck:
+    deck_key: str
+    archetype: str
+    count: int
+    wins: int
+    losses: int
+    sample_names: list[str]
+
+
+def detect_level_deficits(
+    profile: dict | None, my_deck_cards: list[dict] | None
+) -> list[LevelDeficit]:
+    if profile is None or my_deck_cards is None:
+        return []
+    levels_by_name = {
+        card["name"]: card for card in profile.get("cards", [])
+    }
+    deficits: list[LevelDeficit] = []
+    for card in my_deck_cards:
+        name = card["name"]
+        profile_card = levels_by_name.get(name)
+        if profile_card is None:
+            continue
+        level = profile_card["level"]
+        max_level = profile_card["maxLevel"]
+        deficit = max_level - level
+        if deficit > 0:
+            deficits.append(
+                LevelDeficit(
+                    card_name=name,
+                    level=level,
+                    max_level=max_level,
+                    deficit=deficit,
+                )
+            )
+    return deficits
+
+
+def frequent_opponent_decks(
+    battles: list[dict], reference: Reference, *, top: int = 5
+) -> list[OpponentDeck]:
+    groups: dict[str, dict] = {}
+    order: list[str] = []
+    for battle in battles:
+        opponent = battle["opponent"]
+        deck_key = opponent["deck_key"]
+        if deck_key not in groups:
+            groups[deck_key] = {
+                "deck_key": deck_key,
+                "cards": opponent["cards"],
+                "count": 0,
+                "wins": 0,
+                "losses": 0,
+            }
+            order.append(deck_key)
+        group = groups[deck_key]
+        group["count"] += 1
+        result = battle["result"]
+        if result == "win":
+            group["wins"] += 1
+        elif result == "loss":
+            group["losses"] += 1
+    ranked = sorted(
+        order,
+        key=lambda key: (-groups[key]["count"], order.index(key)),
+    )
+    decks: list[OpponentDeck] = []
+    for key in ranked[:top]:
+        group = groups[key]
+        classification = classify_deck(group["cards"], reference)
+        sample_names = [card["name"] for card in group["cards"]][:8]
+        decks.append(
+            OpponentDeck(
+                deck_key=group["deck_key"],
+                archetype=classification.archetype,
+                count=group["count"],
+                wins=group["wins"],
+                losses=group["losses"],
+                sample_names=sample_names,
+            )
+        )
+    return decks
