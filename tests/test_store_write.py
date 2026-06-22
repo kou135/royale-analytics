@@ -128,3 +128,48 @@ def test_upsert_skips_unparseable_battletime(tmp_path):
                           team_crowns=0, opp_crowns=1, opponent_tag="#B")
     bad["battleTime"] = "not-a-time"
     assert s.upsert_battles("#ME", [good, bad]) == 1
+
+
+def test_upsert_skips_malformed_battle(tmp_path):
+    """A battle with a card dict missing 'elixirCost' is skipped; the good one is stored."""
+    from royale_analytics.store import Store
+    from tests.factories import make_raw_battle, HOG_DECK, GOLEM_DECK
+    import copy
+    s = Store(str(tmp_path / "db.sqlite"))
+    s.init_schema()
+    good = make_raw_battle(team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+                           team_crowns=2, opp_crowns=0, opponent_tag="#GOOD")
+    malformed = copy.deepcopy(
+        make_raw_battle(team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+                        team_crowns=1, opp_crowns=0, opponent_tag="#BAD",
+                        battle_time="20260502T041910.000Z")
+    )
+    # Remove elixirCost from one card to trigger KeyError in _to_card_dict.
+    del malformed["team"][0]["cards"][0]["elixirCost"]
+    result = s.upsert_battles("#ME", [good, malformed])
+    assert result == 1
+    count = s.conn.execute("SELECT COUNT(*) FROM battles").fetchone()[0]
+    assert count == 1
+
+
+def test_upsert_skips_2v2_battles(tmp_path):
+    """A 2v2 battle (team/opponent arrays of length 2) is skipped; only the 1v1 is stored."""
+    from royale_analytics.store import Store
+    from tests.factories import make_raw_battle, HOG_DECK, GOLEM_DECK
+    import copy
+    s = Store(str(tmp_path / "db.sqlite"))
+    s.init_schema()
+    good = make_raw_battle(team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+                           team_crowns=1, opp_crowns=0, opponent_tag="#GOOD1V1")
+    twov2 = copy.deepcopy(
+        make_raw_battle(team_cards=HOG_DECK, opp_cards=GOLEM_DECK,
+                        team_crowns=2, opp_crowns=1, opponent_tag="#2V2A",
+                        battle_time="20260502T051910.000Z")
+    )
+    # Make it a 2v2 by duplicating both sides.
+    twov2["team"] = twov2["team"] + copy.deepcopy(twov2["team"])
+    twov2["opponent"] = twov2["opponent"] + copy.deepcopy(twov2["opponent"])
+    result = s.upsert_battles("#ME", [good, twov2])
+    assert result == 1
+    count = s.conn.execute("SELECT COUNT(*) FROM battles").fetchone()[0]
+    assert count == 1

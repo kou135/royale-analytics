@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import warnings
 from datetime import datetime, timezone
 
 from royale_analytics.battletime import to_utc_iso
@@ -95,10 +96,15 @@ def _to_card_dict(api_card: dict) -> dict:
     }
 
 
-def _derive_result(team_crowns: int, opponent_crowns: int) -> str:
-    if team_crowns > opponent_crowns:
+def _derive_result(team_crowns: int | None, opponent_crowns: int | None) -> str:
+    try:
+        tc = int(team_crowns) if team_crowns is not None else 0
+        oc = int(opponent_crowns) if opponent_crowns is not None else 0
+    except (TypeError, ValueError):
+        return "draw"
+    if tc > oc:
         return "win"
-    if team_crowns < opponent_crowns:
+    if tc < oc:
         return "loss"
     return "draw"
 
@@ -125,43 +131,73 @@ class Store:
     def upsert_battles(self, player_tag: str, battlelog: list[dict]) -> int:
         inserted = 0
         for raw in battlelog:
-            team = raw["team"][0]
-            opponent = raw["opponent"][0]
-            opponent_tag = opponent["tag"]
+            # FIX #2: skip non-standard (2v2 or otherwise abnormal) battles.
+            if (
+                len(raw.get("team", [])) != 1
+                or len(raw.get("opponent", [])) != 1
+            ):
+                warnings.warn(
+                    f"Skipping battle with non-1v1 team/opponent arity "
+                    f"(team={len(raw.get('team', []))}, "
+                    f"opponent={len(raw.get('opponent', []))})",
+                    stacklevel=2,
+                )
+                continue
+            # FIX #1: wrap entire per-battle body so any unexpected error is
+            # skipped with a warning rather than aborting the whole batch.
+            # Use a savepoint so a partial write is rolled back on failure.
+            self.conn.execute("SAVEPOINT sp_battle")
             try:
-                battle_time = to_utc_iso(raw["battleTime"])
-            except BattleTimeParseError:
+                team = raw["team"][0]
+                opponent = raw["opponent"][0]
+                opponent_tag = opponent["tag"]
+                try:
+                    battle_time = to_utc_iso(raw["battleTime"])
+                except BattleTimeParseError:
+                    self.conn.execute("RELEASE sp_battle")
+                    continue
+                game_mode = raw.get("gameMode") or {}
+                arena = raw.get("arena") or {}
+                cur = self.conn.execute(
+                    "INSERT OR IGNORE INTO battles ("
+                    "player_tag, opponent_tag, battle_time, type, "
+                    "game_mode_id, game_mode_name, arena_name, "
+                    "is_ladder_tournament, league_number, deck_selection, "
+                    "result, raw_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        player_tag,
+                        opponent_tag,
+                        battle_time,
+                        raw.get("type"),
+                        game_mode.get("id"),
+                        game_mode.get("name"),
+                        arena.get("name"),
+                        1 if raw.get("isLadderTournament") else 0,
+                        raw.get("leagueNumber"),
+                        raw.get("deckSelection"),
+                        _derive_result(
+                            team.get("crowns"), opponent.get("crowns")
+                        ),
+                        json.dumps(raw),
+                    ),
+                )
+                if cur.rowcount == 0:
+                    # Already present (UNIQUE collision) -> skip side/card writes.
+                    self.conn.execute("RELEASE sp_battle")
+                    continue
+                battle_id = cur.lastrowid
+                self._insert_side(battle_id, "team", team)
+                self._insert_side(battle_id, "opponent", opponent)
+                self.conn.execute("RELEASE sp_battle")
+                inserted += 1
+            except Exception as exc:  # noqa: BLE001
+                self.conn.execute("ROLLBACK TO sp_battle")
+                self.conn.execute("RELEASE sp_battle")
+                warnings.warn(
+                    f"Skipping malformed battle (raw_json stored for recovery): {exc}",
+                    stacklevel=2,
+                )
                 continue
-            game_mode = raw.get("gameMode") or {}
-            arena = raw.get("arena") or {}
-            cur = self.conn.execute(
-                "INSERT OR IGNORE INTO battles ("
-                "player_tag, opponent_tag, battle_time, type, "
-                "game_mode_id, game_mode_name, arena_name, "
-                "is_ladder_tournament, league_number, deck_selection, "
-                "result, raw_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (
-                    player_tag,
-                    opponent_tag,
-                    battle_time,
-                    raw.get("type"),
-                    game_mode.get("id"),
-                    game_mode.get("name"),
-                    arena.get("name"),
-                    1 if raw.get("isLadderTournament") else 0,
-                    raw.get("leagueNumber"),
-                    raw.get("deckSelection"),
-                    _derive_result(team["crowns"], opponent["crowns"]),
-                    json.dumps(raw),
-                ),
-            )
-            if cur.rowcount == 0:
-                # Already present (UNIQUE collision) -> skip side/card writes.
-                continue
-            inserted += 1
-            battle_id = cur.lastrowid
-            self._insert_side(battle_id, "team", team)
-            self._insert_side(battle_id, "opponent", opponent)
         self.conn.commit()
         return inserted
 
