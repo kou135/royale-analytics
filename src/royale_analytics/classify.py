@@ -68,7 +68,11 @@ def _role_counts(roles: list[str]) -> dict:
 
 def _weakness_tags(roles: list[str], tags: list[list[str]]) -> list[str]:
     flat_tags = [t for card_tags in tags for t in card_tags]
-    air_targeting = sum(1 for card_tags in tags if "air-targeting" in card_tags)
+    air_targeting = sum(
+        1
+        for role, card_tags in zip(roles, tags)
+        if "air-targeting" in card_tags and role != "spell"
+    )
     splash = sum(1 for t in flat_tags if t == "splash")
     building = sum(1 for t in flat_tags if t == "building")
     spell_count = sum(1 for role in roles if role == "spell")
