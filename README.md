@@ -1,4 +1,4 @@
-# Royale Analytics
+# Royale Deep Analytics
 
 OSS の Clash Royale 対戦履歴 AI 分析ツール（Claude Code skill）。決定論的な Python コアが公式 API（RoyaleAPI proxy 経由）からデータを取得・蓄積・集計し、構造化した「分析ブリーフ（Markdown ＋ JSON）」を出力します。Claude Code のセッションがそのブリーフを読み、局所解に陥らない多様な次アクションを提案します。
 
