@@ -1,0 +1,25 @@
+{
+  "version": "2026-06",
+  "cards": {
+    "Hog Rider":        {"role": "wincon",  "tags": ["building-target", "ground"]},
+    "Ice Spirit":       {"role": "cycle",   "tags": ["air-targeting", "splash", "cheap"]},
+    "Ice Golem":        {"role": "cycle",   "tags": ["ground", "mini-tank", "building-target"]},
+    "Skeletons":        {"role": "cycle",   "tags": ["ground", "swarm", "cheap"]},
+    "Musketeer":        {"role": "support", "tags": ["air-targeting", "ranged"]},
+    "Fireball":         {"role": "spell",   "tags": ["air-targeting", "splash", "medium-spell"]},
+    "The Log":          {"role": "spell",   "tags": ["ground", "splash", "small-spell"]},
+    "Cannon":           {"role": "defense", "tags": ["building", "ground"]},
+    "Golem":            {"role": "wincon",  "tags": ["ground", "tank", "building-target"]},
+    "Baby Dragon":      {"role": "support", "tags": ["air", "air-targeting", "splash"]},
+    "Mega Minion":      {"role": "support", "tags": ["air", "air-targeting"]},
+    "Lightning":        {"role": "spell",   "tags": ["air-targeting", "splash", "big-spell"]},
+    "Tornado":          {"role": "spell",   "tags": ["utility"]},
+    "Lumberjack":       {"role": "support", "tags": ["ground", "rage"]},
+    "Barbarian Barrel": {"role": "spell",   "tags": ["ground", "splash", "small-spell"]},
+    "Night Witch":      {"role": "support", "tags": ["ground", "spawner"]},
+    "X-Bow":            {"role": "wincon",  "tags": ["building", "siege", "ground"]},
+    "Tesla":            {"role": "defense", "tags": ["building", "air-targeting"]},
+    "Archers":          {"role": "support", "tags": ["air-targeting", "ranged"]},
+    "Knight":           {"role": "defense", "tags": ["ground", "mini-tank"]}
+  }
+}

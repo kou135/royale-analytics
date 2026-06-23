@@ -1,0 +1,35 @@
+{
+  "version": "2026-06",
+  "decks": [
+    {
+      "name": "Hog 2.6 Cycle",
+      "archetype": "cycle",
+      "cards": ["Hog Rider", "Ice Spirit", "Ice Golem", "Skeletons", "Musketeer", "Fireball", "The Log", "Cannon"],
+      "avg_elixir": 2.6,
+      "win_condition": "Hog で継続的にタワーを削り、相手の Hog 対策より速くサイクルして押し切る",
+      "strengths": ["高速サイクル", "ポジティブトレードしやすい", "防衛が固い"],
+      "weaknesses": ["1枚あたりの火力が低い", "重いスプラッシュに弱い", "逆転の決定力が乏しい"],
+      "counters": "Hog を止める建物 / 重スプラッシュ＋忍耐の防衛で削り切らせない"
+    },
+    {
+      "name": "Golem Beatdown",
+      "archetype": "beatdown",
+      "cards": ["Golem", "Baby Dragon", "Mega Minion", "Lightning", "Tornado", "Lumberjack", "Barbarian Barrel", "Night Witch"],
+      "avg_elixir": 4.3,
+      "win_condition": "Golem を盾に支援を積み上げ、ダブルエリで巨大プッシュを通す",
+      "strengths": ["圧倒的な後半火力", "ダブルエリで支配的"],
+      "weaknesses": ["スロースタート", "逆サイド punish に弱い", "防衛建物が無い"],
+      "counters": "序盤に逆サイドを攻めて committ を罰する / Inferno でタンクを溶かす"
+    },
+    {
+      "name": "X-Bow 2.9",
+      "archetype": "siege",
+      "cards": ["X-Bow", "Tesla", "Archers", "Knight", "Ice Spirit", "Skeletons", "Fireball", "The Log"],
+      "avg_elixir": 2.9,
+      "win_condition": "X-Bow を自陣に置き、防衛を強要しながらタワーを削る",
+      "strengths": ["継続 chip", "防衛が堅い"],
+      "weaknesses": ["読まれやすい", "高速ラッシュとブリッジ圧に弱い"],
+      "counters": "X-Bow をタンクで受けつつ逆サイドへ高速ラッシュ"
+    }
+  ]
+}

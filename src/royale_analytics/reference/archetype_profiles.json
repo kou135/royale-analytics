@@ -1,0 +1,30 @@
+{
+  "version": "2026-06",
+  "archetypes": {
+    "beatdown": {
+      "win_condition": "高HPタンクの裏に火力を積み、ダブルエリで一撃必殺の大型プッシュを作る",
+      "strengths": ["止めにくい大型プッシュ", "ダブルエリで支配的"],
+      "weaknesses": ["スロースタート", "重い committ を逆サイドで punish される", "Inferno/スウォームに弱い", "高速サイクルに先行される"]
+    },
+    "control": {
+      "win_condition": "効率的な防衛でポジティブトレードを重ね、カウンタープッシュで chip する",
+      "strengths": ["エリ効率", "テンポ管理", "適応力"],
+      "weaknesses": ["直接火力が低い/遅い", "精密なタイミングが要る", "単発の overwhelming プッシュと序盤の圧に弱い", "時間切れになりやすい"]
+    },
+    "cycle": {
+      "win_condition": "安価札で素早く回し、相手の対策より速く win condition を再投下して chip し続ける",
+      "strengths": ["速度", "継続的な圧", "エリ経済"],
+      "weaknesses": ["1枚の火力が低い", "ネガティブトレードに弱い", "重スプラッシュと忍耐の防衛に弱い"]
+    },
+    "siege": {
+      "win_condition": "X-Bow/Mortar で自陣から相手タワーを攻撃し、防衛を強要して削る",
+      "strengths": ["継続 chip", "多目的な建物", "反応を強要"],
+      "weaknesses": ["読まれやすい", "建物の位置取りミスが致命的", "近接ブリッジ圧と高速ラッシュに弱い"]
+    },
+    "bridge_spam": {
+      "win_condition": "ブリッジへ高速・高火力ユニットを送り、相手の overcommit を punish する",
+      "strengths": ["速い不意の圧", "反応を強要"],
+      "weaknesses": ["準備された防衛に止められる", "綺麗に捌かれると不利"]
+    }
+  }
+}

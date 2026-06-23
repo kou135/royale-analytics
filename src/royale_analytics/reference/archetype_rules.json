@@ -1,0 +1,8 @@
+{
+  "version": "2026-06",
+  "tank_cards": ["Golem", "Lava Hound", "Giant", "Electro Giant", "Goblin Giant"],
+  "siege_cards": ["X-Bow", "Mortar"],
+  "bridge_spam_cards": ["Battle Ram", "Bandit", "Ram Rider", "Royal Ghost"],
+  "cycle_max_avg_elixir": 3.0,
+  "beatdown_min_avg_elixir": 3.8
+}
