@@ -57,3 +57,12 @@ def test_load_config_missing_token_raises():
 def test_load_config_missing_player_tag_raises():
     with pytest.raises(ConfigError):
         load_config({"CLASH_ROYALE_API_TOKEN": "t"})
+
+
+def test_config_token_not_in_repr():
+    secret = "super-secret-token-12345"
+    cfg = load_config({"CLASH_ROYALE_API_TOKEN": secret, "CR_PLAYER_TAG": "#C0G"})
+    r = repr(cfg)
+    assert secret not in r
+    assert cfg.token == secret
+    assert "https://proxy.royaleapi.dev/v1" in r

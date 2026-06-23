@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -13,10 +14,10 @@ DEFAULT_DB_PATH = "data/royale.sqlite"
 
 @dataclass(frozen=True)
 class Config:
-    token: str
-    base_url: str
-    player_tag: str  # normalized (no '#')
-    db_path: str
+    token: str = dataclasses.field(repr=False)
+    base_url: str = dataclasses.field(default="")
+    player_tag: str = dataclasses.field(default="")  # normalized (no '#')
+    db_path: str = dataclasses.field(default="")
 
 
 def load_config(env: Mapping[str, str] | None = None) -> Config:
